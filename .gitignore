@@ -1,0 +1,8 @@
+node_modules/
+dist/
+keys/*.pem
+!keys/README.md
+exporter/website-key.generated.js
+*.npsync
+*.npsync.part
+.env

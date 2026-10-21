@@ -1,0 +1,29 @@
+{
+  "name": "navy-payslip-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-way payroll package export for NAVY-PAYROLL: offline exporter + shared package format used by the website.",
+  "main": "shared/index.js",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "export": "node exporter/main.js",
+    "dry-run": "node exporter/main.js --dry-run",
+    "ledger": "node exporter/main.js --ledger",
+    "show-key": "node exporter/main.js --show-key",
+    "keygen": "node scripts/keygen.js",
+    "test": "node --test",
+    "build:exe": "node scripts/build-exe.js"
+  },
+  "dependencies": {
+    "mssql": "^11.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "postject": "^1.0.0-alpha.6"
+  },
+  "files": [
+    "shared/"
+  ]
+}
