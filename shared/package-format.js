@@ -23,6 +23,7 @@
  * Header (example):
  * {
  *   "format": 1, "kind": "month", "exporterId": "navy-payroll-office-01", "exporterKeyId": "…",
+ *   "exporterPublicKey": "-----BEGIN PUBLIC KEY-----…",   (Ed25519, covered by the signature)
  *   "seq": 42, "baseSeq": 41, "period": "202610",
  *   "databases": ["officers", …], "createdAt": "2026-10-28T10:14:03.512Z", "operator": "…",
  *   "manifestVersion": 1, "exporterVersion": "0.1.0",
@@ -43,9 +44,9 @@ const RECORD = { BATCH: 1, MANIFEST: 2, END: 255 };
 
 class PackageError extends Error {
   /**
-   * codes: bad-magic, bad-header, header-too-large, bad-signature, unknown-exporter, truncated,
-   *        payload-hash-mismatch, decrypt-failed, bad-record, missing-end, sequence-gap,
-   *        sequence-old, not-applicable
+   * codes: bad-magic, bad-header, header-too-large, bad-signature, unknown-exporter,
+   *        exporter-key-changed, truncated, payload-hash-mismatch, decrypt-failed, bad-record,
+   *        missing-end, sequence-gap, sequence-old, not-applicable
    */
   constructor(code, message) {
     super(message);

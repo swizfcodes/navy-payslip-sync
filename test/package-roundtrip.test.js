@@ -117,7 +117,7 @@ test("another exporter's key is refused", async () => {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "npsync-"));
   const { filePath } = await makePackage(dir);
   const other = generateExporterKeyPair();
-  await assert.rejects(verifyPackage(filePath, { exporterPublicKeyPem: other.publicKeyPem }), { code: "bad-signature" });
+  await assert.rejects(verifyPackage(filePath, { exporterPublicKeyPem: other.publicKeyPem }), { code: "exporter-key-changed" });
   await assert.rejects(verifyPackage(filePath, { exporterPublicKeyPem: null }), { code: "unknown-exporter" });
   await fsp.rm(dir, { recursive: true, force: true });
 });
@@ -151,6 +151,20 @@ test("abort removes the partial file", async () => {
   await w.abort();
   const files = await fsp.readdir(dir);
   assert.deepEqual(files, []);
+  await fsp.rm(dir, { recursive: true, force: true });
+});
+
+test("a new exporter can be inspected for approval; a changed key is refused", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "npsync-"));
+  const { filePath } = await makePackage(dir);
+  const info = await sync.reader.inspectNewExporter(filePath);
+  assert.equal(info.exporterId, "test-exporter");
+  assert.equal(info.keyId, sync.crypto.keyId(exp.publicKeyPem));
+  assert.match(info.keyIdFormatted, /^[0-9A-F]{4}(-[0-9A-F]{4}){3}$/);
+  const approvedButDifferent = generateExporterKeyPair();
+  await assert.rejects(verifyPackage(filePath, { exporterPublicKeyPem: approvedButDifferent.publicKeyPem }), {
+    code: "exporter-key-changed",
+  });
   await fsp.rm(dir, { recursive: true, force: true });
 });
 

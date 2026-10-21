@@ -146,12 +146,16 @@ class PackageWriter {
       format: FORMAT_VERSION,
       ...headerFields,
       exporterKeyId: exporterPublicKeyPem ? keyId(exporterPublicKeyPem) : undefined,
+      // The public key travels with every package so the website can offer "approve this exporter".
+      // It is covered by the signature; trust still comes only from a person approving the key id.
+      exporterPublicKey: exporterPublicKeyPem || undefined,
       createdAt: headerFields.createdAt || new Date().toISOString(),
       payloadBytes: this.payloadBytes,
       payloadSha256: this.hash.digest("hex"),
       encryption: { ...this.encryption, authTag: authTag.toString("base64") },
     };
     if (header.exporterKeyId === undefined) delete header.exporterKeyId;
+    if (header.exporterPublicKey === undefined) delete header.exporterPublicKey;
     header.signature = signHeader(header, exporterPrivateKeyPem);
 
     const headerBuf = Buffer.from(JSON.stringify(header), "utf8");

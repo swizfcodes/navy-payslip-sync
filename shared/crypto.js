@@ -42,10 +42,18 @@ function toPrivateKey(pemOrKey) {
   return pemOrKey instanceof crypto.KeyObject ? pemOrKey : crypto.createPrivateKey(pemOrKey);
 }
 
-/** Short, stable id for a public key (shown when registering an exporter). */
+/** Short, stable id for a public key (shown when approving an exporter). */
 function keyId(publicKeyPem) {
   const der = toPublicKey(publicKeyPem).export({ type: "spki", format: "der" });
   return crypto.createHash("sha256").update(der).digest("hex").slice(0, 16);
+}
+
+/** "3f9c1a2b7d0e55aa" -> "3F9C-1A2B-7D0E-55AA" (how people read and compare key ids). */
+function formatKeyId(id) {
+  return String(id)
+    .toUpperCase()
+    .match(/.{1,4}/g)
+    .join("-");
 }
 
 // ---------- payload key agreement ----------
@@ -140,6 +148,7 @@ module.exports = {
   generateWebsiteKeyPair,
   generateExporterKeyPair,
   keyId,
+  formatKeyId,
   createPayloadKey,
   recoverPayloadKey,
   createPayloadCipher,

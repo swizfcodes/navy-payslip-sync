@@ -1,6 +1,7 @@
 "use strict";
 
 const { dots, mb, formatDuration, num } = require("./format");
+const { formatKeyId } = require("../../shared/crypto");
 
 /** STEP 3 — Done. */
 function stepDone(result) {
@@ -14,6 +15,7 @@ function stepDone(result) {
   }
   console.log(`  ${dots("Fingerprint", 15)} ${result.fingerprint}   <- write this in the media log`);
   console.log(`  ${dots("Time", 15)} ${formatDuration(result.seconds * 1000)}`);
+  if (h.exporterKeyId) console.log(`  ${dots("Exporter key", 15)} ${formatKeyId(h.exporterKeyId)}   (the website shows this when approving a new exporter)`);
   console.log("");
   for (const [db, r] of Object.entries(result.manifest.databases)) {
     console.log(`  ${db.padEnd(15)} ${num(r.totals.staffCount).padStart(8)} staff   net ${r.totals.totalNet}`);

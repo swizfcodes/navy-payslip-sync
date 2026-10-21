@@ -60,10 +60,16 @@ function selectExpr(col) {
 const SKIP_TYPES = new Set(["timestamp", "rowversion"]);
 
 class MssqlSource {
-  constructor(sourceConfig, password, { maxConnections = 8 } = {}) {
+  /**
+   * sourceConfig: { server, port, user, encrypt, trustServerCertificate }
+   * options: { maxConnections, database (default master), readOnly (default true) }
+   */
+  constructor(sourceConfig, password, { maxConnections = 8, database = "master", readOnly = true } = {}) {
     this.cfg = sourceConfig;
     this.password = password;
     this.maxConnections = maxConnections;
+    this.database = database;
+    this.readOnly = readOnly;
     this.pool = null;
   }
 
@@ -74,7 +80,7 @@ class MssqlSource {
       port: named || !this.cfg.port ? undefined : Number(this.cfg.port),
       user: this.cfg.user,
       password: this.password,
-      database: "master",
+      database: this.database,
       connectionTimeout: 30000,
       requestTimeout: 0, // streams of large tables must not time out
       pool: { max: this.maxConnections, min: 0, idleTimeoutMillis: 60000 },
@@ -82,7 +88,7 @@ class MssqlSource {
         encrypt: Boolean(this.cfg.encrypt),
         trustServerCertificate: this.cfg.trustServerCertificate !== false,
         enableArithAbort: true,
-        readOnlyIntent: true,
+        readOnlyIntent: this.readOnly,
         appName: "navy-payslip-exporter",
       },
     });
@@ -106,6 +112,89 @@ class MssqlSource {
     for (const [name, value] of Object.entries(params)) req.input(name, sql.NVarChar, value == null ? null : String(value));
     const res = await req.query(text);
     return res.recordset;
+  }
+
+  /**
+   * Payroll databases on this server: user databases that have both py_stdrate and hr_employees.
+   * [{ name, staff, period, hasPayrollClass }]
+   */
+  async listPayrollDatabases() {
+    const dbs = await this.query(
+      `SELECT name FROM sys.databases
+        WHERE database_id > 4 AND state = 0 AND HAS_DBACCESS(name) = 1
+        ORDER BY name`,
+    );
+    const out = [];
+    for (const { name } of dbs) {
+      if (!IDENT.test(name)) continue;
+      const [probe] = await this.query(
+        `SELECT OBJECT_ID(N'${name}.dbo.py_stdrate') AS stdrate,
+                OBJECT_ID(N'${name}.dbo.hr_employees') AS emp,
+                OBJECT_ID(N'${name}.dbo.py_payrollclass') AS pclass`,
+      );
+      if (!probe.stdrate || !probe.emp) continue;
+      let staff = null;
+      let period = null;
+      try {
+        staff = await this.countRows(name, "hr_employees");
+        period = await this.currentPeriod(name);
+      } catch (_) {
+        /* listed anyway; the Connect step reports details */
+      }
+      out.push({ name, staff, period, hasPayrollClass: Boolean(probe.pclass) });
+    }
+    return out;
+  }
+
+  /** Rows of py_payrollclass in one database, all columns as text ([] if unreadable). */
+  async payrollClasses(database) {
+    try {
+      const cols = await this.columns(database, "py_payrollclass");
+      if (!cols.length) return [];
+      const list = cols.map((c) => `CONVERT(nvarchar(200), ${q(c.name)}) AS ${q(c.name)}`).join(", ");
+      return await this.query(`SELECT ${list} FROM ${q(database)}.dbo.py_payrollclass`);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /**
+   * Admin connection only: create (or keep) a SQL login and give it read-only access
+   * (db_datareader) on each database. Returns a list of what was done.
+   */
+  async createReadOnlyLogin(login, password, databases, { resetPassword = false } = {}) {
+    if (!IDENT.test(login)) throw new Error(`Login name "${login}" has invalid characters`);
+    const done = [];
+    const [exists] = await this.query(`SELECT COUNT(*) AS n FROM sys.server_principals WHERE name = @l`, { l: login });
+    if (!exists.n) {
+      await this.query(
+        `DECLARE @s nvarchar(max) = N'CREATE LOGIN ' + QUOTENAME(@l) + N' WITH PASSWORD = ' + QUOTENAME(@p, '''') + N', CHECK_POLICY = ON';
+         EXEC sp_executesql @s;`,
+        { l: login, p: password },
+      );
+      done.push(`created login ${login}`);
+    } else if (resetPassword) {
+      await this.query(
+        `DECLARE @s nvarchar(max) = N'ALTER LOGIN ' + QUOTENAME(@l) + N' WITH PASSWORD = ' + QUOTENAME(@p, '''');
+         EXEC sp_executesql @s;`,
+        { l: login, p: password },
+      );
+      done.push(`reset password of login ${login}`);
+    } else {
+      done.push(`login ${login} already exists (password unchanged)`);
+    }
+    for (const db of databases) {
+      await this.query(
+        `DECLARE @s nvarchar(max) = N'USE ' + QUOTENAME(@d) + N';
+           IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = ' + QUOTENAME(@l, '''') + N')
+             EXEC(N''CREATE USER ' + REPLACE(QUOTENAME(@l), '''', '''''') + N' FOR LOGIN ' + REPLACE(QUOTENAME(@l), '''', '''''') + N''');
+           EXEC sp_addrolemember N''db_datareader'', ' + QUOTENAME(@l, '''') + N';';
+         EXEC sp_executesql @s;`,
+        { d: db, l: login },
+      );
+      done.push(`${db}: read-only access for ${login}`);
+    }
+    return done;
   }
 
   /** [{ name, dataType, logical }] in table order; [] if the table does not exist. */

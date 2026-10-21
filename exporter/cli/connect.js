@@ -5,12 +5,12 @@ const { activeDatabases } = require("../config");
 const { checkDatabase } = require("../checks");
 const { dots, num, col, rcol } = require("./format");
 
-/** STEP 1 — Connect. Returns { source, databases, period } or throws. */
-async function stepConnect(prompt, config) {
+/** STEP 1 — Connect. Returns { source, databases, period } or throws. knownPassword: from setup, this run only. */
+async function stepConnect(prompt, config, knownPassword) {
   console.log("\nSTEP 1 of 3 — Connect");
   console.log(`  ${dots("Server", 18)} ${config.source.server}`);
   console.log(`  ${dots("Read-only user", 18)} ${config.source.user}`);
-  const password = await prompt.askHidden(`  ${dots("Password", 18)}`);
+  const password = knownPassword || (await prompt.askHidden(`  ${dots("Password", 18)}`));
 
   const databases = activeDatabases(config);
   if (!databases.length) throw new Error("No databases configured. Run with --setup.");

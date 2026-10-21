@@ -5,6 +5,10 @@
  *
  *   const { header } = await readHeader(file);                       // plain, no keys needed
  *   const exporterKey = lookUpExporter(header.exporterId);            // from sync_exporters
+ *   if (!exporterKey) {
+ *     // New exporter: show its key id for a super admin to approve (inspectNewExporter), then store
+ *     // publicKeyPem in sync_exporters. Never approve automatically.
+ *   }
  *   await verifyPackage(file, { exporterPublicKeyPem: exporterKey });  // signature + payload hash
  *   for await (const rec of readRecords(file, { websitePrivateKeyPem, header })) {
  *     if (rec.type === "batch") ... rec.batch (decoded, checksum verified)
@@ -25,7 +29,7 @@ const {
   parseHeaderBuffer,
   validateHeaderShape,
 } = require("./package-format");
-const { verifyHeaderSignature, recoverPayloadKey, createPayloadDecipher } = require("./crypto");
+const { verifyHeaderSignature, recoverPayloadKey, createPayloadDecipher, keyId, formatKeyId } = require("./crypto");
 const { decodeBatch } = require("./batch-format");
 
 async function readHeader(filePath) {
@@ -56,6 +60,12 @@ async function verifyPackage(filePath, { exporterPublicKeyPem }) {
   if (!exporterPublicKeyPem) {
     throw new PackageError("unknown-exporter", `Exporter "${header.exporterId}" is not registered`);
   }
+  if (header.exporterPublicKey && keyId(header.exporterPublicKey) !== keyId(exporterPublicKeyPem)) {
+    throw new PackageError(
+      "exporter-key-changed",
+      `Exporter "${header.exporterId}" now uses key ${formatKeyId(keyId(header.exporterPublicKey))}, not the approved ${formatKeyId(keyId(exporterPublicKeyPem))}`,
+    );
+  }
   if (!verifyHeaderSignature(header, exporterPublicKeyPem)) {
     throw new PackageError("bad-signature", "Signature does not match: the file was changed or not made by this exporter");
   }
@@ -68,6 +78,28 @@ async function verifyPackage(filePath, { exporterPublicKeyPem }) {
     throw new PackageError("payload-hash-mismatch", "File contents do not match the signed fingerprint");
   }
   return { header, payloadOffset };
+}
+
+/**
+ * For an exporter the website does not know yet: check the file against the key it carries,
+ * and return what a super admin needs to approve it. The approver compares keyIdFormatted with
+ * the key id shown on the exporter's screen (read out by the payroll officer). Approval stores
+ * publicKeyPem in sync_exporters; only then may the package be processed.
+ */
+async function inspectNewExporter(filePath) {
+  const { header } = await readHeader(filePath);
+  if (!header.exporterPublicKey) {
+    throw new PackageError("unknown-exporter", "Package does not carry its exporter key; register the key by hand");
+  }
+  await verifyPackage(filePath, { exporterPublicKeyPem: header.exporterPublicKey });
+  const id = keyId(header.exporterPublicKey);
+  return {
+    exporterId: header.exporterId,
+    keyId: id,
+    keyIdFormatted: formatKeyId(id),
+    publicKeyPem: header.exporterPublicKey,
+    header,
+  };
 }
 
 /** Incremental parser for the decrypted record stream. */
@@ -161,4 +193,4 @@ async function* readRecords(filePath, { websitePrivateKeyPem, header, payloadOff
   if (!sawEnd || parser.length !== 0) throw new PackageError("missing-end", "Package ended without its end record");
 }
 
-module.exports = { readHeader, verifyPackage, readRecords };
+module.exports = { readHeader, verifyPackage, inspectNewExporter, readRecords };

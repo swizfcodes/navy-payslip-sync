@@ -24,6 +24,7 @@ const { stepExport } = require("./cli/export");
 const { stepDone } = require("./cli/done");
 const { stateDir } = require("./paths");
 const { mb } = require("./cli/format");
+const { formatKeyId } = require("../shared/crypto");
 
 const HELP = `
 NAVY Payslip Exporter v${pkg.version}
@@ -32,8 +33,8 @@ Usage: navy-sync-exporter [option]
 
   (no option)      Connect, export a month or full package, show the fingerprint
   --dry-run        Timing test: reads and packs everything, writes a package the website never applies
-  --setup          Change the SQL Server, login or database names
-  --show-key       Print this exporter's public key (register it on the website once)
+  --setup          Change the server or database names, or create the read-only login
+  --show-key       Print this exporter's key id and public key
   --ledger         List the packages exported from this machine
   --discard-last   Mark the last package as never uploaded (lost or destroyed)
   --help           This text
@@ -44,7 +45,7 @@ Files kept on this machine: ${stateDir()}
 async function showKey(exporterKeys) {
   const cfg = configExists() ? await loadConfig() : null;
   console.log(`\nExporter name ... ${cfg ? cfg.exporterId : "(not set up yet: run without options first)"}`);
-  console.log(`Key id .......... ${exporterKeys.keyId}`);
+  console.log(`Key id .......... ${formatKeyId(exporterKeys.keyId)}`);
   console.log("\nPublic key (copy all lines, including BEGIN/END, to the website registration):\n");
   console.log(exporterKeys.publicKeyPem);
 }
@@ -89,9 +90,11 @@ async function main(argv) {
 
   console.log(`NAVY Payslip Exporter  v${pkg.version}`);
   const exporterKeys = await ensureExporterKeys();
+  console.log(`  Exporter key id: ${formatKeyId(exporterKeys.keyId)}`);
   if (exporterKeys.created) {
     console.log(`  A new exporter key was created in ${stateDir()}.`);
-    console.log("  Register it on the website before the first upload (run with --show-key).");
+    console.log("  The key travels inside every package. When the website asks to approve this exporter,");
+    console.log("  check that it shows the same key id as above.");
   }
 
   if (args.has("--show-key")) return showKey(exporterKeys);
@@ -103,16 +106,18 @@ async function main(argv) {
     if (args.has("--discard-last")) return await discard(prompt);
 
     let config;
+    let password = null;
     if (!configExists() || args.has("--setup")) {
       const existing = configExists() ? await loadConfig().catch(() => null) : null;
-      config = await runSetup(prompt, existing);
+      ({ config, password } = await runSetup(prompt, existing));
     } else {
       config = await loadConfig();
       console.log(`  Settings: ${configPath()}`);
     }
 
     const websitePublicKeyPem = loadWebsitePublicKey();
-    const conn = await stepConnect(prompt, config);
+    const conn = await stepConnect(prompt, config, password);
+    password = null;
     source = conn.source;
 
     const result = await stepExport(prompt, {

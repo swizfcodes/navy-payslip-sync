@@ -5,7 +5,7 @@ One-way payroll export for NAVY-PAYROLL.
 - **`exporter/`** runs inside the offline payroll network. It reads the payroll databases with a read-only login and writes one encrypted, signed `.npsync` package to removable media. Built into a single `navy-sync-exporter.exe`.
 - **`shared/`** is the package format, the table list (manifest) and the crypto. The website (NAVY-PAYROLL) installs this repo and uses only `shared/` to verify and read packages.
 
-Plan and contracts: `NAVY-PAYROLL/docs/payslip-sync/` (02 architecture, 05 contracts, 06 performance, 08 work split).
+**Documentation:** [`docs/`](docs/README.md) — overview, decisions, design, package format, website contract, guides for the payroll and sync officers, build and release, delivery plan, operations.
 
 ## Rules for this repo
 
