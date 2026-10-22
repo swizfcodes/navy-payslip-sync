@@ -19,7 +19,7 @@ What one month's package holds, per payroll database:
 | `ac_months`, `py_elementtype`, `py_bank`, `py_pfa`, `ac_businessline`, `ac_costcentre` | swap | whole table | Full table (small) | Prepare, skipped if unchanged |
 | `hr_employees` (payroll columns only) | merge-columns | `EMPL_ID` | Payroll columns for all staff (narrow; compresses well) | Prepare |
 | `py_ipis_payhistory` | replace-scope | `period` | Rows of the period | Prepare |
-| `py_payhistory` | merge-columns | `his_empno, his_year, his_type` | Month column groups closed since the previous package (normally one) | Prepare |
+| `py_payhistory` | merge-columns | `his_empno, his_year, his_type` | Only month column groups **closed** since the previous package (normally one); never the current month, which is read from `py_masterpayded`; only rows of that year | Prepare |
 | `py_masterpayded`, `py_mastercum` | swap | whole table | Full table | Loaded in Prepare, switched at Go live |
 | `py_stdrate` | swap | whole table | Full table | Switched at Go live |
 | `py_payrollclass` | swap | whole table, master DB | Full table | Prepare |

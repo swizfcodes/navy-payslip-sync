@@ -46,7 +46,8 @@ async function stepConnect(prompt, config, knownPassword) {
     throw new Error(`Databases are on different periods (${periods.join(", ")}). All must be on the same BT05 period.`);
   }
 
-  return { source, databases, period: periods[0] };
+  // The password stays in memory for this run only: worker processes need it to connect.
+  return { source, databases, period: periods[0], password };
 }
 
 module.exports = { stepConnect };

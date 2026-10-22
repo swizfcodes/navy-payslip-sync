@@ -2,7 +2,18 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { monthsBetween, monthGroups } = require("../exporter/extract/months");
+const { monthsBetween, monthGroups, closedMonthsSince, previousPeriod } = require("../exporter/extract/months");
+
+test("closed months since the previous package (the current month is never sent)", () => {
+  assert.equal(previousPeriod("202601"), "202512");
+  assert.deepEqual(closedMonthsSince("202609", "202610"), [{ year: 2026, months: [9] }]);
+  assert.deepEqual(closedMonthsSince("202608", "202610"), [{ year: 2026, months: [8, 9] }]);
+  assert.deepEqual(closedMonthsSince("202512", "202601"), [{ year: 2025, months: [12] }]);
+  assert.deepEqual(closedMonthsSince("202610", "202610"), []); // same period exported again
+  assert.deepEqual(closedMonthsSince(null, "202610"), [{ year: 2026, months: [9] }]);
+  assert.throws(() => closedMonthsSince("202611", "202610"), /earlier/);
+  assert.throws(() => closedMonthsSince("202401", "202610"), /full package/);
+});
 
 test("months from the previous package to this one, grouped by year", () => {
   assert.deepEqual(monthsBetween("202609", "202610"), [{ year: 2026, months: [9, 10] }]);

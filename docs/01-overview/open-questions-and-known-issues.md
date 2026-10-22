@@ -9,7 +9,7 @@
 | 3 | Is approval needed before a month is uploaded? | Client payroll | Production procedure |
 | 4 | How many years of payslip history must be reprintable? | Client | Full package size (measured by the Day 2 full dry run) |
 | 5 | Are all six website databases on one MySQL server (staging and production)? | Dev B | How Go live is batched |
-| 6 | Does `hicaddata.hr_employees` hold every staff member? | Dev B | Login and payslip lookup |
+| 6 | Does `hicaddata.hr_employees` hold every staff member? | Dev B | Login and payslip lookup. Legacy master has 54,348 staff (22 Oct); confirm on the website DB |
 | 7 | Which PC and connection will the sync officer upload from? | Client | Upload time in the 15-minute budget |
 | 8 | Do legacy column names and types match the website's (for example `his_type` in `py_mastercum`)? | Dev A, first real run | Export |
 | 9 | Phase 2 scope: which website changes go back to payroll? | Client | Phase 2 only |
@@ -31,7 +31,7 @@ Details and SQL: [Performance](../02-design/performance.md), "Findings so far" a
 
 ## Known limits of the exporter (v0.1.0)
 
-- Not yet run against the legacy SQL Server; the setup SQL (login creation, database discovery) is untested on a real server.
+- First real run on 22 Oct 2026: setup, Connect and a Full export of `officers` worked against a local SQL Server copy. Not yet run with all six databases or on the payroll server.
 - Passwords are typed each run (no saved password).
 - Phase 2 MySQL source is not written yet.
 - Database matching in setup is a suggestion from `py_payrollclass` and names; the officer confirms it.

@@ -225,6 +225,19 @@ class MssqlSource {
     return { year, month, period: `${year}${String(month).padStart(2, "0")}` };
   }
 
+  /** True if some index on the table has `column` as its first key column (so ORDER BY needs no sort). */
+  async hasLeadingIndex(database, table, column) {
+    const rows = await this.query(
+      `SELECT TOP 1 1 AS ok
+         FROM ${q(database)}.sys.indexes i
+         JOIN ${q(database)}.sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+         JOIN ${q(database)}.sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        WHERE i.object_id = OBJECT_ID(@obj) AND ic.key_ordinal = 1 AND c.name = @c`,
+      { obj: `${database}.dbo.${table}`, c: column },
+    );
+    return rows.length > 0;
+  }
+
   async countRows(database, table) {
     const rows = await this.query(`SELECT COUNT_BIG(*) AS n FROM ${q(database)}.dbo.${q(table)}`);
     return Number(rows[0].n);

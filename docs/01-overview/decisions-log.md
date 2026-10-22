@@ -29,3 +29,8 @@ Newest last. Each line says what was decided and why. Change a decision by addin
 | 23 | 21 Oct 2026 | Exporter setup creates the read-only login (admin login typed once, never saved) and finds and maps the databases itself | Fewer manual steps for the officer and DBA |
 | 24 | 21 Oct 2026 | The exporter's public key travels inside every package; a super admin approves a new exporter by comparing its key id with the exporter's screen | No key files carried by hand |
 | 25 | 21 Oct 2026 | Index fixes on the website DB before M1: primary key on `py_ipis_payhistory`, index on `py_webpayslip`, drop duplicate indexes | Staff payslip views and loads were scanning whole tables |
+| 26 | 22 Oct 2026 | A month package sends only `py_payhistory` months **closed** since the previous package (previous package's month up to the month before this one; normally one month group). The current month is never sent | The payslip procedure reads the current month from `py_masterpayded`; the current column is not final until month-end. Halves that table in every month package |
+| 27 | 22 Oct 2026 | The exporter runs each database in its own process (`useProcesses`, default on), up to `concurrency` at once | One Node process uses one CPU core; the first real run was CPU-bound in Node, not in SQL Server |
+| 28 | 22 Oct 2026 | Ask SQL Server for key order only when an index starts with the key column | A full sort of a big table costs minutes and the website does not need the order |
+| 29 | 22 Oct 2026 | A Full package is not held to the 15-minute target; the monthly publish is | Full is for the first load and recovery only |
+

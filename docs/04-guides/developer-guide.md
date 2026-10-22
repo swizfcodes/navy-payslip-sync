@@ -30,7 +30,8 @@ exporter/               runs inside the offline network
   sources/mssql-source.js   streaming reads with exact values; discovery; login creation
   extract/extractor.js  manifest → batches per database
   extract/months.js     py_payhistory month groups and ranges
-  export-job.js         databases in parallel into one package; ledger update
+  export-job.js         databases in parallel into one package; starts worker processes; ledger update
+  worker.js             one database in its own process; sends batches back over IPC
   checks.js, config.js, keys.js, ledger.js, paths.js
 scripts/                keygen.js, build-exe.js
 test/                   node --test
@@ -51,7 +52,7 @@ test/                   node --test
 1. `checks.js` verifies each database: tables present, `hr_employees` payroll columns present, BT05 period.
 2. `export-job.planExport` works out `seq`, `baseSeq` and the `py_payhistory` months from the ledger.
 3. `PackageWriter.create` opens `<file>.part`, reserves the header, starts the cipher.
-4. Each database runs `extractor.extractDatabase` in parallel: for each manifest table it plans the reads (whole table, one period, or one year with chosen month columns), streams rows, converts values, and sends 5,000-row gzipped batches to the writer.
+4. Each database runs `extractor.extractDatabase` in parallel. With `useProcesses` (default) each runs in a copy of the program started with `NAVY_SYNC_WORKER=1` (`worker.js`), which connects with the same read-only login and sends gzipped batches back over IPC; the main process writes them into the one package and acknowledges each (at most 3 unacknowledged per worker). For each manifest table the extractor plans the reads (whole table, one period, or one year with chosen month columns), asks for key order only if an index provides it, streams rows, converts values, and makes 5,000-row batches.
 5. The writer writes the manifest and end record, finishes the cipher, writes the signed header into the reserved space, and renames the file.
 6. The ledger gets a new line.
 

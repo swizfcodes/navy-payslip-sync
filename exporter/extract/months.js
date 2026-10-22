@@ -3,8 +3,13 @@
 /**
  * py_payhistory has one row per staff + pay type + year, with 12 month column groups
  * (amtthismth1..12, totamtpayable1..12, nmth1..12, bankcode1..12, bankacnumber1..12, ...).
- * A month package sends only the key columns plus the month groups that changed since the
- * previous package: every month from the previous package's period to this period, inclusive.
+ *
+ * A month package sends only the key columns plus the month groups CLOSED since the previous
+ * package: from the previous package's period up to the month before this period.
+ *   - The current period is read by the payslip procedure from py_masterpayded, not py_payhistory,
+ *     so its column is not needed (and is not final until month-end).
+ *   - The previous package's own month was still open when it was exported; it is closed now.
+ * Normally that is exactly one month group.
  */
 
 function parsePeriod(period) {
@@ -78,4 +83,36 @@ function monthGroups(columnNames) {
   };
 }
 
-module.exports = { parsePeriod, periodIndex, monthsBetween, monthGroups, MAX_SPAN_MONTHS };
+function formatPeriod(index) {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}${String(month).padStart(2, "0")}`;
+}
+
+function previousPeriod(period) {
+  return formatPeriod(periodIndex(period) - 1);
+}
+
+/**
+ * Closed months to send in a month package, grouped by year: [{ year, months }], possibly [].
+ *   prevPeriod: period of the previous package (null if none: then only the month before `period`)
+ */
+function closedMonthsSince(prevPeriod, period) {
+  const last = previousPeriod(period);
+  if (prevPeriod && periodIndex(prevPeriod) > periodIndex(period)) {
+    throw new Error(`Period ${period} is earlier than the previous package (${prevPeriod})`);
+  }
+  const from = prevPeriod || last;
+  if (periodIndex(from) > periodIndex(last)) return []; // same period exported again
+  return monthsBetween(from, last);
+}
+
+module.exports = {
+  parsePeriod,
+  periodIndex,
+  previousPeriod,
+  monthsBetween,
+  closedMonthsSince,
+  monthGroups,
+  MAX_SPAN_MONTHS,
+};

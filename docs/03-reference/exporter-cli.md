@@ -38,7 +38,8 @@ Folder: `%ProgramData%\navy-payslip-sync` (override with `NAVY_SYNC_HOME`). Neve
   "outputDir": "E:\\",
   "lastOperator": "…",
   "batchRows": 5000,
-  "concurrency": 6
+  "concurrency": 6,
+  "useProcesses": true
 }
 ```
 
@@ -49,13 +50,14 @@ Folder: `%ProgramData%\navy-payslip-sync` (override with `NAVY_SYNC_HOME`). Neve
 | `databases` | Website name → legacy database name; empty = skip that class |
 | `batchRows` | 100–50,000 (default 5,000) |
 | `concurrency` | Databases read in parallel, 1–6 (default 6) |
+| `useProcesses` | `true` (default): each database in its own process, so each uses its own CPU core. `false`: all in one process (fallback if starting worker processes is blocked) |
 
 ## Package numbering
 
 - `seq` always goes up; it is never reused.
 - `baseSeq` = the last package not marked discarded.
 - The first real package must be **Full**. Month packages need a previous package in the ledger.
-- A month package carries `py_payhistory` month columns from the previous package's period to this one (normally one or two months). More than 13 months apart: export a Full package instead.
+- A month package carries only the `py_payhistory` months **closed** since the previous package: from the previous package's month up to the month before this one (normally one month). The current month is never sent. If the same period is exported again, no `py_payhistory` months are sent. More than 13 months apart: export a Full package instead.
 - After the website rolls a package back, run `--discard-last` before the next export.
 
 ## Output file names

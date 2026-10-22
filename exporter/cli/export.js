@@ -18,7 +18,9 @@ function scopeLabel(scope) {
 }
 
 /** STEP 2 — Export. Returns the export result. */
-async function stepExport(prompt, { config, source, databases, period, dryRun, keys }) {
+const PROGRESS_EVERY = 250000; // print a running count for long tables
+
+async function stepExport(prompt, { config, source, databases, period, password, dryRun, keys }) {
   console.log("\nSTEP 2 of 3 — Export");
 
   let kind = "dryrun";
@@ -51,8 +53,13 @@ async function stepExport(prompt, { config, source, databases, period, dryRun, k
     console.log(`  Package seq ${plan.seq} (${follows}), ${kind}, ${prettyPeriod(period)}, ${databases.length} database(s)`);
   }
   if (plan.payhistoryMonths) {
-    const m = plan.payhistoryMonths.map((g) => `${g.year}: months ${g.months.join(",")}`).join("; ");
-    console.log(`  py_payhistory month columns: ${m}`);
+    const m = plan.payhistoryMonths.length
+      ? plan.payhistoryMonths.map((g) => `${g.year}: month ${g.months.join(",")}`).join("; ")
+      : "none (no month closed since the last package)";
+    console.log(`  py_payhistory closed months to send: ${m}`);
+  }
+  if (config.useProcesses !== false && databases.length > 1) {
+    console.log(`  Using ${Math.min(config.concurrency, databases.length)} processes (one per database).`);
   }
   if (!(await prompt.confirm("  Start export", true))) throw new Error("Export cancelled");
 
@@ -61,8 +68,10 @@ async function stepExport(prompt, { config, source, databases, period, dryRun, k
   await saveConfig(config);
 
   console.log("  Exporting...");
+  const printed = new Map();
   const result = await runExport({
     source,
+    password,
     config,
     databases,
     kind,
@@ -73,7 +82,16 @@ async function stepExport(prompt, { config, source, databases, period, dryRun, k
     websitePublicKeyPem: keys.websitePublicKeyPem,
     exporterKeys: keys.exporter,
     onEvent: (e) => {
-      if (e.type === "table-done") {
+      if (e.type === "table-progress") {
+        const k = `${e.database}.${e.table}`;
+        const step = Math.floor(e.rows / PROGRESS_EVERY);
+        if (step > (printed.get(k) || 0)) {
+          printed.set(k, step);
+          console.log(`    ${col(e.database, 15)} ${col(`${e.table} …`, 36)} ${rcol(num(e.rows), 11)} rows so far`);
+        }
+      } else if (e.type === "table-skipped") {
+        console.log(`    ${col(e.database, 15)} ${col(e.table, 36)} ${rcol("-", 11)}  ${e.reason}`);
+      } else if (e.type === "table-done") {
         const label = `${e.table}${e.scope ? ` (${scopeLabel(e.scope)})` : ""}`;
         console.log(
           `    ${col(e.database, 15)} ${col(label, 36)} ${rcol(num(e.rows), 11)} rows ${rcol(formatDuration(e.ms), 10)}`,

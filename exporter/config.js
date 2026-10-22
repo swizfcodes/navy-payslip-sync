@@ -17,7 +17,8 @@ const CONFIG_FILE = "config.json";
  *   "outputDir": "E:\\",
  *   "lastOperator": "",
  *   "batchRows": 5000,
- *   "concurrency": 6
+ *   "concurrency": 6,          // databases exported at the same time
+ *   "useProcesses": true       // each in its own process, so each gets its own CPU core
  * }
  */
 const DEFAULTS = {
@@ -35,6 +36,7 @@ const DEFAULTS = {
   lastOperator: "",
   batchRows: 5000,
   concurrency: 6,
+  useProcesses: true, // one process per database (uses more CPU cores); false = all in one process
 };
 
 function configPath() {
@@ -80,6 +82,7 @@ function validateConfig(cfg) {
   if (!Number.isInteger(cfg.concurrency) || cfg.concurrency < 1 || cfg.concurrency > 6) {
     throw new Error("concurrency must be between 1 and 6");
   }
+  if (typeof cfg.useProcesses !== "boolean") throw new Error("useProcesses must be true or false");
 }
 
 /** [{ website, source }] for the databases that are configured (non-empty source name). */

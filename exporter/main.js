@@ -125,6 +125,7 @@ async function main(argv) {
       source,
       databases: conn.databases,
       period: conn.period,
+      password: conn.password,
       dryRun: args.has("--dry-run"),
       keys: { websitePublicKeyPem, exporter: exporterKeys },
     });
@@ -147,9 +148,14 @@ function waitForEnter() {
   });
 }
 
-main(process.argv.slice(2))
-  .catch((err) => {
-    console.error(`\n  ERROR: ${err.message}\n`);
-    process.exitCode = 1;
-  })
-  .then(waitForEnter);
+if (process.env.NAVY_SYNC_WORKER === "1") {
+  // A copy started by export-job.js to export one database (see worker.js).
+  require("./worker").runWorker();
+} else {
+  main(process.argv.slice(2))
+    .catch((err) => {
+      console.error(`\n  ERROR: ${err.message}\n`);
+      process.exitCode = 1;
+    })
+    .then(waitForEnter);
+}

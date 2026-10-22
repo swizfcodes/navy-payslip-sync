@@ -102,6 +102,31 @@ Notes:
 - Column names differ in case between tables (`his_Empno` vs `his_empno`). MySQL treats them as the same; the manifest matches column names case-insensitively.
 - These go in as a normal migration in `config/sql/migrations/` when building starts.
 
+## First real run (22 Oct 2026, HP EliteBook 845 G8, SQL Server on the same laptop)
+
+Full package, `officers` (master) only, before the changes below:
+
+| Table | Rows | Time |
+|---|---|---|
+| `py_payhistory` (all years) | 918,384 | 2 min 55 s |
+| `py_masterpayded` | 483,414 | 26 s |
+| `py_ipis_payhistory` | 545,681 | 8 s |
+| `hr_employees` | 54,348 | 1 s |
+| Others | small | 0 s |
+| **Total** | | **3 min 32 s, 55 MB** |
+
+- Throughput was about 0.35–0.6 million values per second in every big table: the work is per value in Node (one CPU core), not SQL Server alone.
+- The other five databases hold about 2 million `py_payhistory` rows each, so a Full package of all six in one process would take well over 20 minutes.
+- The master `hr_employees` has 54,348 staff; `officers` paid 4,357 in 2026-09 (net 3,041,747,294.93).
+
+Changes made the same day (v0.1.1):
+
+1. One process per database (`useProcesses`), so the six databases use separate CPU cores.
+2. No `ORDER BY` unless an index starts with the key column, so SQL Server does not sort big tables.
+3. Month packages send only closed `py_payhistory` months of the current year (normally one month group), never the whole year or the current month.
+
+Still to measure: a Month dry run with all six databases (the 15-minute check) and a Full dry run with all six (expected well under the single-process figure). The payroll server's own hardware will differ from this laptop.
+
 ## If measurements say it is still too slow (tier 2)
 
 - **Smaller packages for `py_masterpayded`:** send only employees whose lines changed since `baseSeq`; the website builds the stage table as a local copy of live (fast, same server) and applies the changes.

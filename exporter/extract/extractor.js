@@ -95,6 +95,20 @@ async function extractDatabase({ source, db, kind, period, payhistoryMonths, bat
     if (!sourceCols.length) throw new Error(`${ctx}: table not found`);
 
     const parts = planTable(table, sourceCols, { period, payhistoryMonths, ctx });
+    // Ask SQL Server for key order only if an index gives it for free; a full sort of a big
+    // table costs minutes and the website does not need the order.
+    if (parts.length && parts[0].orderBy.length) {
+      let indexed = false;
+      try {
+        indexed = await source.hasLeadingIndex(db.source, table.name, parts[0].orderBy[0]);
+      } catch (_) {
+        indexed = false;
+      }
+      if (!indexed) for (const p of parts) p.orderBy = [];
+    }
+    if (!parts.length) {
+      onEvent({ type: "table-skipped", database: db.website, table: table.name, reason: "nothing to send" });
+    }
     for (const part of parts) {
       const t0 = Date.now();
       onEvent({ type: "table-start", database: db.website, table: table.name, scope: part.scope });
