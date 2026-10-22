@@ -17,8 +17,8 @@ What one month's package holds, per payroll database:
 | Table | Mode | Key / scope | In the package | Applied at |
 |---|---|---|---|---|
 | `ac_months`, `py_elementtype`, `py_bank`, `py_pfa`, `ac_businessline`, `ac_costcentre` | swap | whole table | Full table (small) | Prepare, skipped if unchanged |
-| `hr_employees` (payroll columns only) | merge-columns | `EMPL_ID` | Payroll columns for all staff (narrow; compresses well) | Prepare |
-| `py_ipis_payhistory` | replace-scope | `period` | Rows of the period | Prepare |
+| `hr_employees` (payroll columns only) | merge-columns | `EMPL_ID` | **Master (`officers`) only.** Payroll columns for all staff (narrow; compresses well) | Prepare |
+| `py_ipis_payhistory` | replace-scope | `period` | Rows of the period. **Optional:** skipped where the source database has no IPPIS table | Prepare |
 | `py_payhistory` | merge-columns | `his_empno, his_year, his_type` | Only month column groups **closed** since the previous package (normally one); never the current month, which is read from `py_masterpayded`; only rows of that year | Prepare |
 | `py_masterpayded`, `py_mastercum` | swap | whole table | Full table | Loaded in Prepare, switched at Go live |
 | `py_stdrate` | swap | whole table | Full table | Switched at Go live |
@@ -26,7 +26,7 @@ What one month's package holds, per payroll database:
 
 `hr_employees` payroll columns: `Surname`, `othername`, `Title`, `gradelevel`, `bankcode`, `BankACNumber`, `pfacode`, `nsitfcode`, `factory`, `location`, `payrollclass`, `dateleft`. Final list per decision in [Open questions](../01-overview/open-questions-and-known-issues.md).
 
-Each table is written to the website database it came from (`officers` = master `hicaddata`; each class database has its own `hr_employees`). See [Website contract](../03-reference/website-contract.md).
+Each table is written to the website database it came from (`officers` = master `hicaddata`). `hr_employees` and `py_payrollclass` exist only in the master. See [Website contract](../03-reference/website-contract.md).
 
 Website-owned, never in a package: login and security columns of `hr_employees`, emolument tables (`ef_*`), notifications, audit, roles, `py_webpayslip`.
 
@@ -45,5 +45,5 @@ Exact SQL: [Website contract](../03-reference/website-contract.md#apply-go-live-
 ## Which database each table is written to
 
 - Every table in a package is written to **the same website database it came from**: the batch's `database` field (`officers`, `wofficers`, `ratings`, `ratingsA`, `ratingsB`, `juniorTrainee`).
-- `officers` is the master database (`hicaddata`). It holds `py_payrollclass` and the `hr_employees` the login and payslip lookup use (step 1 of "How the website builds a payslip today" in [Architecture](architecture.md)). Each class database also has its own `hr_employees`, which the payslip procedure reads after `USE <class db>`. Both are merged from their own source database.
-- To confirm on staging: `hicaddata.hr_employees` has every staff member (the login lookup depends on it).
+- `officers` is the master database (`hicaddata`). It holds `py_payrollclass` and `hr_employees` with every staff member; the class databases have neither (22 Oct, website and package agree).
+- `py_ipis_payhistory` is optional per database (see the table above).

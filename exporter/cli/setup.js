@@ -81,7 +81,7 @@ async function chooseDatabases(prompt, found, suggestion, current) {
   console.log(`\n  Found ${found.length} payroll database(s) on this server:`);
   found.forEach((d, i) => {
     const per = d.period ? `period ${d.period.year}-${String(d.period.month).padStart(2, "0")}` : "no BT05";
-    const staff = d.staff == null ? "" : `${num(d.staff)} staff`;
+    const staff = d.staff == null ? "" : `${num(d.staff)} ${d.staffLabel || "staff"}`;
     const master = d.hasPayrollClass ? "  (has py_payrollclass)" : "";
     console.log(`    [${i + 1}] ${d.name.padEnd(24)} ${staff.padStart(14)}   ${per}${master}`);
   });
@@ -153,7 +153,7 @@ async function runSetup(prompt, existing) {
   try {
     console.log("\n  Looking for payroll databases...");
     const found = await source.listPayrollDatabases();
-    if (!found.length) throw new Error("No payroll databases visible to this login (none has py_stdrate and hr_employees).");
+    if (!found.length) throw new Error("No payroll databases visible to this login (none has py_stdrate and py_elementtype).");
     const suggestion = await suggestMapping(source, found);
     cfg.databases = await chooseDatabases(prompt, found, suggestion, cfg.databases || {});
 

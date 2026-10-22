@@ -9,7 +9,8 @@
 | 3 | Is approval needed before a month is uploaded? | Client payroll | Production procedure |
 | 4 | How many years of payslip history must be reprintable? | Client | Full package size (measured by the Day 2 full dry run) |
 | 5 | Are all six website databases on one MySQL server (staging and production)? | Dev B | How Go live is batched |
-| 6 | Does `hicaddata.hr_employees` hold every staff member? | Dev B | Login and payslip lookup. Legacy master has 54,348 staff (22 Oct); confirm on the website DB |
+| 6 | ~~Does `hicaddata.hr_employees` hold every staff member?~~ **Answered 22 Oct:** yes (website 54,358, legacy master 54,348); class databases have no `hr_employees`. Exporter now sends it from the master only | — | — |
+| 6a | Does the legacy juniorTrainee database have `py_ipis_payhistory` rows? The website `hicaddata5` has no such table | Dev A (check the legacy copy) | If yes, Dev B adds the table; it should exist (empty) anyway for the payslip procedure |
 | 7 | Which PC and connection will the sync officer upload from? | Client | Upload time in the 15-minute budget |
 | 8 | Do legacy column names and types match the website's (for example `his_type` in `py_mastercum`)? | Dev A, first real run | Export |
 | 9 | Phase 2 scope: which website changes go back to payroll? | Client | Phase 2 only |

@@ -9,6 +9,10 @@
  *   replace-scope  only rows of one scope value (e.g. one period) are replaced
  *   merge-columns  rows matched by `key`; only the sent columns are written; new keys inserted; nothing deleted
  *
+ * masterOnly: only in the master database (officers = hicaddata), never in the class databases.
+ * optional:   if the table does not exist in a source database, it is skipped (not an error) and the
+ *             package simply has no entry for it in that database.
+ *
  * applyAt:
  *   prepare  applied while the month is still invisible (safe, see 02 §4.1)
  *   golive   swapped in by the single RENAME TABLE at Go live
@@ -72,15 +76,19 @@ const TABLES = [
     masterOnly: true,
   },
   {
+    // Master only: on the website hr_employees exists only in hicaddata, holding every staff member.
     name: "hr_employees",
     key: ["EMPL_ID"],
+    masterOnly: true,
     columns: HR_EMPLOYEES_PAYROLL_COLUMNS,
     month: { mode: "merge-columns", applyAt: "prepare" },
     full: { mode: "merge-columns", applyAt: "prepare" },
   },
   {
+    // Optional: some class databases (e.g. juniorTrainee) have no IPPIS table.
     name: "py_ipis_payhistory",
     key: ["period", "numb", "Type"],
+    optional: true,
     columns: ALL,
     month: { mode: "replace-scope", scope: "period", applyAt: "prepare" },
     full: { mode: "swap", applyAt: "golive" },
@@ -139,6 +147,7 @@ function tablesFor(database, kind) {
     name: t.name,
     key: t.key,
     columns: t.columns,
+    optional: Boolean(t.optional),
     ...t[plan],
     rollback: rollbackFor(t[plan].mode),
   }));

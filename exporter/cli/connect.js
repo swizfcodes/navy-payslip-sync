@@ -28,10 +28,11 @@ async function stepConnect(prompt, config, knownPassword) {
     const r = await checkDatabase(source, db);
     results.push(r);
     const status = r.ok ? "ok" : "FAILED";
-    const staff = r.staff == null ? "" : `${num(r.staff)} staff`;
+    const staff = r.staff == null ? "" : `${num(r.staff)} ${r.staffLabel || "staff"}`;
     const per = r.period ? `period ${r.period.year}-${String(r.period.month).padStart(2, "0")}` : "";
     console.log(`    ${col(db.website, 15)} ${col(status, 7)} ${rcol(staff, 14)}   ${per}`);
     for (const p of r.problems) console.log(`        - ${p}`);
+    for (const n of r.notes || []) console.log(`        note: ${n}`);
   }
 
   const failed = results.filter((r) => !r.ok);

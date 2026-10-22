@@ -114,8 +114,8 @@ The rename swaps rather than drops, so a rollback can itself be reversed. `__und
 ## Which database each table is written to
 
 - Every table in a package is written to **the same website database it came from**: the batch's `database` field (`officers`, `wofficers`, `ratings`, `ratingsA`, `ratingsB`, `juniorTrainee`).
-- `officers` is the master database (`hicaddata`). It holds `py_payrollclass` and the `hr_employees` the login and payslip lookup use (step 1 of "How the website builds a payslip today" in [Architecture](../02-design/architecture.md)). Each class database also has its own `hr_employees`, which the payslip procedure reads after `USE <class db>`. Both are merged from their own source database.
-- To confirm on staging: `hicaddata.hr_employees` has every staff member (the login lookup depends on it).
+- **Master only:** `hr_employees` and `py_payrollclass` are sent only in the `officers` part (the master, `hicaddata`), with every staff member. On the website `hr_employees` exists only in `hicaddata` (54,358 staff on 22 Oct); the legacy master holds 54,348. The master is the truth. If a legacy class database has its own copy, it is not exported.
+- **Optional:** `py_ipis_payhistory` is skipped for a database whose source has no such table (for example juniorTrainee, if the legacy database has none). The package then has no entry for it in that database. The website should still have the table (empty is fine), because the payslip procedure reads it.
 
 ## Approving a new exporter
 

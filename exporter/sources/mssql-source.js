@@ -115,8 +115,9 @@ class MssqlSource {
   }
 
   /**
-   * Payroll databases on this server: user databases that have both py_stdrate and hr_employees.
-   * [{ name, staff, period, hasPayrollClass }]
+   * Payroll databases on this server: user databases that have both py_stdrate and py_elementtype.
+   * (hr_employees may exist only in the master.)
+   * [{ name, staff, staffLabel, period, hasPayrollClass }]
    */
   async listPayrollDatabases() {
     const dbs = await this.query(
@@ -129,19 +130,26 @@ class MssqlSource {
       if (!IDENT.test(name)) continue;
       const [probe] = await this.query(
         `SELECT OBJECT_ID(N'${name}.dbo.py_stdrate') AS stdrate,
+                OBJECT_ID(N'${name}.dbo.py_elementtype') AS elm,
                 OBJECT_ID(N'${name}.dbo.hr_employees') AS emp,
                 OBJECT_ID(N'${name}.dbo.py_payrollclass') AS pclass`,
       );
-      if (!probe.stdrate || !probe.emp) continue;
+      if (!probe.stdrate || !probe.elm) continue;
       let staff = null;
+      let staffLabel = "staff";
       let period = null;
       try {
-        staff = await this.countRows(name, "hr_employees");
         period = await this.currentPeriod(name);
+        if (probe.emp) {
+          staff = await this.countRows(name, "hr_employees");
+        } else if (period) {
+          staff = (await this.totals(name, period.month)).staffCount;
+          staffLabel = "paid";
+        }
       } catch (_) {
         /* listed anyway; the Connect step reports details */
       }
-      out.push({ name, staff, period, hasPayrollClass: Boolean(probe.pclass) });
+      out.push({ name, staff, staffLabel, period, hasPayrollClass: Boolean(probe.pclass), hasEmployees: Boolean(probe.emp) });
     }
     return out;
   }

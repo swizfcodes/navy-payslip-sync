@@ -92,7 +92,13 @@ async function extractDatabase({ source, db, kind, period, payhistoryMonths, bat
     if (isCancelled()) throw new Error("Cancelled");
     const ctx = `${db.source}.dbo.${table.name}`;
     const sourceCols = await source.columns(db.source, table.name);
-    if (!sourceCols.length) throw new Error(`${ctx}: table not found`);
+    if (!sourceCols.length) {
+      if (table.optional) {
+        onEvent({ type: "table-skipped", database: db.website, table: table.name, reason: "not in this database" });
+        continue;
+      }
+      throw new Error(`${ctx}: table not found`);
+    }
 
     const parts = planTable(table, sourceCols, { period, payhistoryMonths, ctx });
     // Ask SQL Server for key order only if an index gives it for free; a full sort of a big

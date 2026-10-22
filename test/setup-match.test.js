@@ -35,3 +35,15 @@ test("suggestions come from py_payrollclass, then database names, then the maste
   assert.equal(s.ratingsA, "HicadRatingsA");
   assert.equal(s.ratingsB, undefined);
 });
+
+test("hr_employees and py_payrollclass are master only; IPPIS is optional", () => {
+  const { tablesFor } = require("../shared/manifest");
+  const names = (db) => tablesFor(db, "month").map((t) => t.name);
+  assert.ok(names("officers").includes("hr_employees"));
+  assert.ok(names("officers").includes("py_payrollclass"));
+  for (const db of ["wofficers", "ratings", "ratingsA", "ratingsB", "juniorTrainee"]) {
+    assert.ok(!names(db).includes("hr_employees"), db);
+    assert.ok(!names(db).includes("py_payrollclass"), db);
+  }
+  assert.equal(tablesFor("juniorTrainee", "month").find((t) => t.name === "py_ipis_payhistory").optional, true);
+});

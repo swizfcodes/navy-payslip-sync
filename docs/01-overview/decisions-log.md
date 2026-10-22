@@ -33,4 +33,7 @@ Newest last. Each line says what was decided and why. Change a decision by addin
 | 27 | 22 Oct 2026 | The exporter runs each database in its own process (`useProcesses`, default on), up to `concurrency` at once | One Node process uses one CPU core; the first real run was CPU-bound in Node, not in SQL Server |
 | 28 | 22 Oct 2026 | Ask SQL Server for key order only when an index starts with the key column | A full sort of a big table costs minutes and the website does not need the order |
 | 29 | 22 Oct 2026 | A Full package is not held to the 15-minute target; the monthly publish is | Full is for the first load and recovery only |
+| 30 | 22 Oct 2026 | `hr_employees` is sent only from the master (`officers` = `hicaddata`), with every staff member | On the website it exists only in `hicaddata`; class databases have none. The master is the truth |
+| 31 | 22 Oct 2026 | `py_ipis_payhistory` is optional per database: skipped if the source has no such table | juniorTrainee (`hicaddata5`) has none on the website |
+| 32 | 22 Oct 2026 | Setup recognises a payroll database by `py_stdrate` and `py_masterpayded` (`py_elementtype` is still checked at Connect) | Class databases have no `hr_employees`, so the old rule only found the master; `py_masterpayded` exists only in real payroll databases |
 
