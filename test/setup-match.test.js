@@ -41,11 +41,10 @@ test("hr_employees and py_payrollclass are master only; IPPIS is optional", () =
   const names = (db) => tablesFor(db, "month").map((t) => t.name);
   assert.ok(names("officers").includes("hr_employees"));
   assert.ok(names("officers").includes("py_payrollclass"));
-  const masterOnly = ["hr_employees", "py_payrollclass", "ac_months", "py_bank", "py_pfa", "ac_businessline", "ac_costcentre"];
+  const masterOnly = ["hr_employees", "py_payrollclass", "ac_months", "py_elementtype", "py_bank", "py_pfa", "ac_businessline", "ac_costcentre"];
   for (const t of masterOnly) assert.ok(names("officers").includes(t), t);
   for (const db of ["wofficers", "ratings", "ratingsA", "ratingsB", "juniorTrainee"]) {
     for (const t of masterOnly) assert.ok(!names(db).includes(t), `${db} ${t}`);
-    assert.ok(names(db).includes("py_elementtype"), db);
   }
   assert.equal(tablesFor("juniorTrainee", "month").find((t) => t.name === "py_ipis_payhistory").optional, true);
 });

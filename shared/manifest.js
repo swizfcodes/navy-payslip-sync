@@ -84,13 +84,13 @@ function lookup(name, key, { masterOnly = false } = {}) {
   };
 }
 
-// Shared lookups live only in the master (hicaddata), in payroll and on the website
-// (config/db.js MASTER_TABLES): sent once, from officers; never looked for in class databases.
+// Shared lookups live only in the master (hicaddata) on the website: the class databases
+// (hicaddata1..5) have none of them. Sent once, from officers; never looked for in class databases.
 const MASTER = { masterOnly: true };
 
 const TABLES = [
   lookup("ac_months", ["cmonth"], MASTER),
-  lookup("py_elementtype", ["PaymentType"]),
+  lookup("py_elementtype", ["PaymentType"], MASTER),
   lookup("py_bank", ["bankcode", "branchcode"], MASTER),
   lookup("py_pfa", ["pfacode"], MASTER),
   lookup("ac_businessline", ["busline"], MASTER),
