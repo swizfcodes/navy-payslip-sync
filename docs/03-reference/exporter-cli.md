@@ -37,7 +37,9 @@ Folder: `%ProgramData%\navy-payslip-sync` (override with `NAVY_SYNC_HOME`). Neve
   "databases": { "officers": "HicadData", "wofficers": "…", "ratings": "…", "ratingsA": "…", "ratingsB": "…", "juniorTrainee": "…" },
   "outputDir": "E:\\",
   "lastOperator": "…",
-  "batchRows": 5000,
+  "batchRows": 10000,
+  "packQuality": 9,
+  "packQualityMonth": 6,
   "concurrency": 6,
   "useProcesses": true
 }
@@ -48,7 +50,10 @@ Folder: `%ProgramData%\navy-payslip-sync` (override with `NAVY_SYNC_HOME`). Neve
 | `exporterId` | 3–64 letters, digits, `.`, `-`, `_`. Shown on the website |
 | `source.server` | `HOST\INSTANCE` (port found by SQL Browser) or a host name with `port` |
 | `databases` | Website name → legacy database name; empty = skip that class |
-| `batchRows` | 100–50,000 (default 5,000) |
+| `batchRows` | 100–50,000 (default 10,000; a config still on the old default 5,000 is read as 10,000) |
+| `packQuality` | Brotli quality 1–11 for **Full** packages (default 9). Higher = smaller package, slower export. The dry-run report shows raw and packed MB per table and per database. Measured 27 Oct 2026: officers Full 28 MB in 1 min 2 s (was 55 MB, 3 min 31 s with gzip) |
+| `stallSeconds` | Optional, default 180. A database with no new rows for this long stops the attempt; the export then starts again once by itself. Each run is logged to `export-log.txt` in the state folder |
+| `packQualityMonth` | The same for **Month** packages and month dry runs (default 6, kept fast for the 15-minute target) |
 | `concurrency` | Databases read in parallel, 1–6 (default 6) |
 | `useProcesses` | `true` (default): each database in its own process, so each uses its own CPU core. `false`: all in one process (fallback if starting worker processes is blocked) |
 

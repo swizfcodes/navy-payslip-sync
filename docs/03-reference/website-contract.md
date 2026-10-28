@@ -114,7 +114,8 @@ The rename swaps rather than drops, so a rollback can itself be reversed. `__und
 ## Which database each table is written to
 
 - Every table in a package is written to **the same website database it came from**: the batch's `database` field (`officers`, `wofficers`, `ratings`, `ratingsA`, `ratingsB`, `juniorTrainee`).
-- **Master only:** `hr_employees` and `py_payrollclass` are sent only in the `officers` part (the master, `hicaddata`), with every staff member. On the website `hr_employees` exists only in `hicaddata` (54,358 staff on 22 Oct); the legacy master holds 54,348. The master is the truth. If a legacy class database has its own copy, it is not exported.
+- **Which database that is** comes from the website's `py_payrollclass`: the row with that database's classcode (`manifest.DATABASE_CLASSCODES`: officers 1, wofficers 2, ratings 3, ratingsA 4, ratingsB 5, juniorTrainee 6) gives `db_name`. Only the master (`officers` = `hicaddata`, where `py_payrollclass` lives) comes from settings. A class without a row cannot receive data (`unknown-database`); a class row with another classcode is shown in the Console as "not in packages".
+- **Master only:** `hr_employees`, `py_payrollclass` and the shared lookups `ac_months`, `py_bank`, `py_pfa`, `ac_businessline`, `ac_costcentre` are sent only in the `officers` part (the master, `hicaddata`), with every staff member. On the website `hr_employees` exists only in `hicaddata` (54,358 staff on 22 Oct); the legacy master holds 54,348. The master is the truth. If a legacy class database has its own copy, it is not exported.
 - **Optional:** `py_ipis_payhistory` is skipped for a database whose source has no such table (for example juniorTrainee, if the legacy database has none). The package then has no entry for it in that database. The website should still have the table (empty is fine), because the payslip procedure reads it.
 
 ## Approving a new exporter

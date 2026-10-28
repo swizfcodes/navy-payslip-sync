@@ -17,6 +17,7 @@ const { PackageWriter } = require("../shared/package-writer");
 const { extractDatabase } = require("./extract/extractor");
 const { closedMonthsSince } = require("./extract/months");
 const { readLedger, lastKept, nextSeq, appendLedger } = require("./ledger");
+const { runLog } = require("./run-log");
 const pkg = require("../package.json");
 
 async function runLimited(items, limit, worker) {
@@ -68,6 +69,11 @@ function selfCommand() {
 }
 
 /** Export one database in a child process; resolves with the per-database manifest part. */
+/** Brotli quality: Full packages smallest (packQuality), Month packages fast (packQualityMonth). */
+function packQualityFor(planKind, config) {
+  return planKind === "full" ? config.packQuality : config.packQualityMonth;
+}
+
 function extractInProcess({ db, job, writer, onEvent, registerChild }) {
   return new Promise((resolve, reject) => {
     const { command, args } = selfCommand();
@@ -117,11 +123,41 @@ function extractInProcess({ db, job, writer, onEvent, registerChild }) {
  * options: { source, password, config, databases: [{website, source}], kind, period, operator, outputDir,
  *            websitePublicKeyPem, exporterKeys, onEvent }
  */
+class StallError extends Error {
+  constructor(database, seconds) {
+    super(`${database} made no progress for ${Math.round(seconds / 60)} minute(s)`);
+    this.code = "STALLED";
+    this.database = database;
+  }
+}
+
 async function runExport(options) {
   const { source, config, databases, kind, period, operator, outputDir, websitePublicKeyPem, exporterKeys } = options;
   const dryrunOf = options.dryrunOf || "month";
-  const onEvent = options.onEvent || (() => {});
+  const userOnEvent = options.onEvent || (() => {});
   const started = Date.now();
+
+  // ── Watchdog ───────────────────────────────────────────────────────────
+  // Every database must show activity (a table started, a batch of rows, a
+  // table finished) at least every stallSeconds (default 3 min). If one goes
+  // silent, nothing more will come from it (a worker that never started, a
+  // read that never returns): the whole export is stopped with STALLED and
+  // the caller starts it again once. Each event is also written to
+  // export-log.txt, so a hang can be looked at afterwards.
+  const stallMs = (Number(config.stallSeconds) || 180) * 1000;
+  const lastActivity = new Map(); // database → time of its last event
+  const running = new Set();
+  let stallReject = null;
+  const stalled = new Promise((_, reject) => {
+    stallReject = reject;
+  });
+  stalled.catch(() => {});
+  const onEvent = (e) => {
+    if (e && e.database) lastActivity.set(e.database, Date.now());
+    if (e && e.type !== "table-progress") runLog(`${e.type} ${e.database || ""} ${e.table || ""} ${e.rows != null ? e.rows + " rows" : ""}`.trim());
+    userOnEvent(e);
+  };
+  runLog(`export start: kind=${kind}${kind === "dryrun" ? `/${dryrunOf}` : ""} period=${period} databases=${databases.map((d) => d.website).join(",")} processes=${config.useProcesses !== false}`);
 
   const plan = await planExport({ kind, period, dryrunOf });
   const createdAt = new Date();
@@ -142,13 +178,40 @@ async function runExport(options) {
     period,
     payhistoryMonths: plan.payhistoryMonths,
     batchRows: config.batchRows,
+    packQuality: packQualityFor(plan.planKind, config),
   };
+
+  const waitingShown = new Map(); // database → minutes already reported
+  const watchdog = setInterval(() => {
+    const now = Date.now();
+    for (const dbName of running) {
+      const idle = now - (lastActivity.get(dbName) || now);
+      if (idle >= stallMs && !firstError) {
+        firstError = new StallError(dbName, idle / 1000);
+        runLog(`STALLED: ${dbName} silent for ${Math.round(idle / 1000)} s; stopping this attempt`);
+        for (const c of children) c.kill();
+        if (!useProcesses && source) source.close().catch(() => {}); // breaks a read that never returns
+        stallReject(firstError);
+        return;
+      }
+      if (idle >= 60000) {
+        const minutes = Math.floor(idle / 60000);
+        if (minutes !== (waitingShown.get(dbName) || 0)) {
+          waitingShown.set(dbName, minutes);
+          userOnEvent({ type: "waiting", database: dbName, seconds: Math.round(idle / 1000) });
+          runLog(`waiting: ${dbName} silent for ${Math.round(idle / 1000)} s`);
+        }
+      }
+    }
+  }, 5000);
 
   let perDb;
   try {
-    perDb = await runLimited(databases, config.concurrency, async (db) => {
+    perDb = await Promise.race([stalled, runLimited(databases, config.concurrency, async (db) => {
       try {
         if (firstError) throw firstError;
+        running.add(db.website);
+        lastActivity.set(db.website, Date.now());
         onEvent({ type: "db-start", database: db.website });
         const r = useProcesses
           ? await extractInProcess({
@@ -168,25 +231,31 @@ async function runExport(options) {
               period,
               payhistoryMonths: plan.payhistoryMonths,
               batchRows: config.batchRows,
+              packQuality: job.packQuality,
               addBatch: (name, buf) => writer.addBatch(name, buf),
               onEvent,
               isCancelled,
             });
+        running.delete(db.website);
         onEvent({ type: "db-done", database: db.website, ms: r.ms, totals: r.totals });
         return r;
       } catch (err) {
+        running.delete(db.website);
         if (!firstError) firstError = new Error(`${db.website} (${db.source}): ${err.message}`);
         for (const c of children) {
           if (c.connected) c.send({ type: "cancel" });
         }
         throw firstError;
       }
-    });
+    })]);
   } catch (err) {
+    clearInterval(watchdog);
     for (const c of children) c.kill();
     await writer.abort();
+    runLog(`export failed: ${(firstError || err).message}`);
     throw firstError || err;
   }
+  clearInterval(watchdog);
 
   const exportMs = Date.now() - started;
   const manifest = {
@@ -244,7 +313,8 @@ async function runExport(options) {
     });
   }
 
+  runLog(`export done: ${fileName} ${result.bytes} bytes in ${seconds} s`);
   return { ...result, plan, manifest, seconds };
 }
 
-module.exports = { planExport, runExport };
+module.exports = { planExport, runExport, StallError };

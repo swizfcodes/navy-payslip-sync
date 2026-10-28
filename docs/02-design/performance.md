@@ -18,9 +18,9 @@ Upload time is set by package size and the link of the PC doing the upload: `min
 
 | Slow part | Fix |
 |---|---|
-| A big package | Only what the month needs: one period of IPPIS, only the new `py_payhistory` month columns (not the year), payroll columns only of `hr_employees`; lookups skipped on the website if unchanged; gzip per batch |
+| A big package | Only what the month needs: one period of IPPIS, only the new `py_payhistory` month columns (not the year), payroll columns only of `hr_employees`; lookups skipped on the website if unchanged; batches stored column by column and brotli-compressed with a 16 MB window (0.1.3; was row-by-row gzip) |
 | One database after another | Exporter reads six databases in parallel and streams them into one file |
-| Read all, then write | Streaming: read → encode → gzip → encrypt → write overlap; nothing held whole in memory |
+| Read all, then write | Streaming: read → encode → compress → encrypt → write overlap (one batch compresses in the zlib thread pool while the next is read); nothing held whole in memory |
 | A dropped upload starting over | Chunked, resumable upload (8 MB chunks); only missing chunks are re-sent |
 | Waiting for the whole upload before work starts | The website verifies the header before the upload, and begins unpacking as soon as the file is complete; batches are loaded as they are read |
 | Row-by-row inserts | Multi-row `INSERT` (2,000–5,000 rows each, sized under `max_allowed_packet`), rows in primary-key order; `local_infile` is OFF |

@@ -78,12 +78,13 @@ function planTable(table, sourceCols, { period, payhistoryMonths, ctx }) {
  *   period:       "YYYYMM" (current BT05)
  *   payhistoryMonths: [{ year, months }] for month/dryrun packages
  *   batchRows:    rows per batch
+ *   packQuality:  brotli quality for batches (1-11, default batch-format DEFAULT_QUALITY)
  *   addBatch:     async (recordName, buffer) => void   (package writer)
  *   onEvent:      (event) => void                     (progress)
  *   isCancelled:  () => boolean
  * Returns the per-database part of the package manifest.
  */
-async function extractDatabase({ source, db, kind, period, payhistoryMonths, batchRows, addBatch, onEvent, isCancelled }) {
+async function extractDatabase({ source, db, kind, period, payhistoryMonths, batchRows, packQuality, addBatch, onEvent, isCancelled }) {
   const started = Date.now();
   const tables = [];
   const { month } = { month: Number(String(period).slice(4, 6)) };
@@ -127,26 +128,39 @@ async function extractDatabase({ source, db, kind, period, payhistoryMonths, bat
       let rawBytes = 0;
       let packedBytes = 0;
       let rows = [];
+      // One batch is compressed (zlib thread pool) while the next one is read from the source.
+      // Batches still reach the package and the checksum list in batchNo order.
+      let inflight = Promise.resolve();
 
       const flush = async () => {
         if (!rows.length) return;
         batchNo += 1;
-        const enc = await encodeBatch({
-          database: db.website,
-          table: table.name,
-          mode: table.mode,
-          scope: part.scope,
-          batchNo,
-          columns,
-          types,
-          rows,
-        });
-        checksums.push(enc.checksum);
-        rawBytes += enc.rawBytes;
-        packedBytes += enc.buffer.length;
-        await addBatch(batchRecordName(db.website, table.name, part.scope, batchNo), enc.buffer);
+        const no = batchNo;
+        const mine = rows;
+        const seen = rowCount;
         rows = [];
-        onEvent({ type: "table-progress", database: db.website, table: table.name, rows: rowCount });
+        const previous = inflight;
+        inflight = (async () => {
+          const enc = await encodeBatch({
+            database: db.website,
+            table: table.name,
+            mode: table.mode,
+            scope: part.scope,
+            batchNo: no,
+            columns,
+            types,
+            rows: mine,
+            quality: packQuality,
+          });
+          await previous;
+          checksums.push(enc.checksum);
+          rawBytes += enc.rawBytes;
+          packedBytes += enc.buffer.length;
+          await addBatch(batchRecordName(db.website, table.name, part.scope, no), enc.buffer);
+          onEvent({ type: "table-progress", database: db.website, table: table.name, rows: seen });
+        })();
+        inflight.catch(() => {}); // awaited at the next flush or after the last one
+        await previous;
       };
 
       const stream = source.streamRows(db.source, table.name, {
@@ -168,6 +182,7 @@ async function extractDatabase({ source, db, kind, period, payhistoryMonths, bat
           }
         }
         await flush();
+        await inflight;
       } finally {
         stream.destroy();
       }

@@ -59,6 +59,39 @@ function selectExpr(col) {
 
 const SKIP_TYPES = new Set(["timestamp", "rowversion"]);
 
+/**
+ * Server names as people type them in SSMS: "." and "(local)" mean this computer,
+ * "NAME,1433" carries a port. The driver understands neither, so turn them into
+ * "localhost" and a separate port.
+ */
+function normaliseServer(server) {
+  let s = String(server || "").trim();
+  let port = null;
+  const comma = s.match(/^(.*),\s*(\d{1,5})$/);
+  if (comma) {
+    s = comma[1].trim();
+    port = Number(comma[2]);
+  }
+  s = s.replace(/^(\.|\(local\)|localhost)(?=\\|$)/i, "localhost");
+  return { host: s, port };
+}
+
+// A read that waits on a lock held by another program (for example a payroll
+// calculation still running) gives up after this long with a clear message,
+// instead of waiting for ever. SQL Server error 1222.
+const LOCK_TIMEOUT_MS = 120000;
+const LOCK_PREFIX = `SET LOCK_TIMEOUT ${LOCK_TIMEOUT_MS};\n`;
+
+function friendlyError(err, what) {
+  if (err && (err.number === 1222 || /Lock request time out/i.test(err.message || ""))) {
+    return new Error(
+      `${what} is locked by another program (for example a payroll calculation that is still running). ` +
+        "Wait for it to finish, then export again.",
+    );
+  }
+  return err;
+}
+
 class MssqlSource {
   /**
    * sourceConfig: { server, port, user, encrypt, trustServerCertificate }
@@ -74,10 +107,12 @@ class MssqlSource {
   }
 
   async connect() {
-    const named = this.cfg.server.includes("\\");
+    const { host, port: givenPort } = normaliseServer(this.cfg.server);
+    const named = host.includes("\\");
+    const port = givenPort || this.cfg.port;
     this.pool = new sql.ConnectionPool({
-      server: this.cfg.server,
-      port: named || !this.cfg.port ? undefined : Number(this.cfg.port),
+      server: host,
+      port: named || !port ? undefined : Number(port),
       user: this.cfg.user,
       password: this.password,
       database: this.database,
@@ -110,8 +145,12 @@ class MssqlSource {
   async query(text, params = {}) {
     const req = this.request();
     for (const [name, value] of Object.entries(params)) req.input(name, sql.NVarChar, value == null ? null : String(value));
-    const res = await req.query(text);
-    return res.recordset;
+    try {
+      const res = await req.query(LOCK_PREFIX + text);
+      return res.recordset;
+    } catch (err) {
+      throw friendlyError(err, "A payroll table");
+    }
   }
 
   /**
@@ -251,6 +290,24 @@ class MssqlSource {
     return Number(rows[0].n);
   }
 
+  /**
+   * IPPIS rows and staff for a period in py_ipis_payhistory, or null when the database
+   * has no such table. Uses the period key column (indexed on the website side too).
+   */
+  async ippisForPeriod(database, period) {
+    const cols = await this.columns(database, "py_ipis_payhistory");
+    if (!cols.length) return null;
+    const periodCol = (cols.find((c) => c.name.toLowerCase() === "period") || {}).name;
+    const numbCol = (cols.find((c) => c.name.toLowerCase() === "numb") || {}).name;
+    if (!periodCol) return null;
+    const rows = await this.query(
+      `SELECT COUNT_BIG(*) AS n${numbCol ? `, COUNT(DISTINCT ${q(numbCol)}) AS staff` : ""}
+         FROM ${q(database)}.dbo.py_ipis_payhistory WHERE ${q(periodCol)} = @p`,
+      { p: String(period) },
+    );
+    return { rows: Number(rows[0].n || 0), staff: numbCol ? Number(rows[0].staff || 0) : null };
+  }
+
   /** Staff count and total net for the month, from py_mastercum (his_type = month number). */
   async totals(database, month) {
     const rows = await this.query(
@@ -276,6 +333,7 @@ class MssqlSource {
       return `${q(col)} = @w${i}`;
     });
     const text =
+      LOCK_PREFIX +
       `SELECT ${selectList} FROM ${q(database)}.dbo.${q(table)}` +
       (conds.length ? ` WHERE ${conds.join(" AND ")}` : "") +
       (orderBy.length ? ` ORDER BY ${orderBy.map(q).join(", ")}` : "");
@@ -291,7 +349,7 @@ class MssqlSource {
     req.on("row", (row) => {
       if (!readable.push(row)) req.pause();
     });
-    req.on("error", (err) => readable.destroy(err));
+    req.on("error", (err) => readable.destroy(friendlyError(err, `${database}.${table}`)));
     req.on("done", () => readable.push(null));
     readable.on("close", () => {
       if (!readable.readableEnded) req.cancel();
@@ -302,4 +360,4 @@ class MssqlSource {
   }
 }
 
-module.exports = { MssqlSource, selectExpr };
+module.exports = { MssqlSource, selectExpr, normaliseServer };

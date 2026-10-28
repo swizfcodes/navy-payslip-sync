@@ -1,6 +1,6 @@
 {
   "name": "navy-payslip-sync",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "One-way payroll package export for NAVY-PAYROLL: offline exporter + shared package format used by the website.",
   "main": "shared/index.js",

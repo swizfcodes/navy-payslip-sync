@@ -7,7 +7,7 @@
  *
  * Started by export-job.js as a copy of this same program with NAVY_SYNC_WORKER=1.
  * Messages (IPC, "advanced" serialization so Buffers pass through):
- *   main -> worker  { type: "start", sourceConfig, password, db, kind, period, payhistoryMonths, batchRows }
+ *   main -> worker  { type: "start", sourceConfig, password, db, kind, period, payhistoryMonths, batchRows, packQuality }
  *                   { type: "ack", id, error? }          (batch written)
  *                   { type: "cancel" }
  *   worker -> main  { type: "batch", id, name, buffer }
@@ -80,6 +80,7 @@ function runWorker() {
         period: msg.period,
         payhistoryMonths: msg.payhistoryMonths,
         batchRows: msg.batchRows,
+        packQuality: msg.packQuality,
         addBatch,
         onEvent: (event) => {
           send({ type: "event", event }).catch(() => {});

@@ -18,7 +18,7 @@ Node 20.12 or newer. To try the exporter against a SQL Server: `npm run export` 
 shared/                 used by exporter AND website; no database drivers
   manifest.js           tables, modes, keys, scopes, applyAt, rollback — the only place table names live
   package-format.js     file layout, header checks, sequence rules, fingerprint, file names, PackageError
-  batch-format.js       batch JSON + gzip + checksum
+  batch-format.js       batch JSON (column by column) + brotli + checksum; reads old gzip batches
   crypto.js             AES-256-GCM, X25519 + HKDF, Ed25519, key ids
   package-writer.js     streams records into an encrypted package
   package-reader.js     readHeader, verifyPackage, inspectNewExporter, readRecords
@@ -52,7 +52,7 @@ test/                   node --test
 1. `checks.js` verifies each database: tables present, `hr_employees` payroll columns present, BT05 period.
 2. `export-job.planExport` works out `seq`, `baseSeq` and the `py_payhistory` months from the ledger.
 3. `PackageWriter.create` opens `<file>.part`, reserves the header, starts the cipher.
-4. Each database runs `extractor.extractDatabase` in parallel. With `useProcesses` (default) each runs in a copy of the program started with `NAVY_SYNC_WORKER=1` (`worker.js`), which connects with the same read-only login and sends gzipped batches back over IPC; the main process writes them into the one package and acknowledges each (at most 3 unacknowledged per worker). For each manifest table the extractor plans the reads (whole table, one period, or one year with chosen month columns), asks for key order only if an index provides it, streams rows, converts values, and makes 5,000-row batches.
+4. Each database runs `extractor.extractDatabase` in parallel. With `useProcesses` (default) each runs in a copy of the program started with `NAVY_SYNC_WORKER=1` (`worker.js`), which connects with the same read-only login and sends compressed batches back over IPC; the main process writes them into the one package and acknowledges each (at most 3 unacknowledged per worker). For each manifest table the extractor plans the reads (whole table, one period, or one year with chosen month columns), asks for key order only if an index provides it, streams rows, converts values, and makes `batchRows`-row batches (default 10,000), compressing one while reading the next.
 5. The writer writes the manifest and end record, finishes the cipher, writes the signed header into the reserved space, and renames the file.
 6. The ledger gets a new line.
 

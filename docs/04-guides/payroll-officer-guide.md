@@ -1,6 +1,6 @@
 # Payroll officer guide
 
-For the person who exports payroll data inside the offline network. You need: the payroll machine with `navy-sync-exporter.exe`, the read-only password, an approved removable drive, and the media log.
+For the person who exports payroll data inside the offline network. A plain-language, printable version is the [Exporter user guide](exporter-user-guide.md); connection errors: [SQL Server connection problems](../06-operations/sql-server-connection-problems.md). You need: the payroll machine with `navy-sync-exporter.exe`, the read-only password, an approved removable drive, and the media log.
 
 ## First time only: setup
 
@@ -17,7 +17,7 @@ Run `navy-sync-exporter.exe`. With no settings yet, it starts setup:
 
 ## Every month
 
-When payroll has closed the month's calculation:
+When payroll has closed the month's calculation **and this month's IPPIS has been uploaded** into payroll:
 
 1. Insert the approved drive.
 2. Run `navy-sync-exporter.exe`.
@@ -27,6 +27,7 @@ When payroll has closed the month's calculation:
    - Period: shown, not chosen. It is the current payroll period.
    - Save to: the removable drive (for example `E:\`).
    - Your name.
+   - Month only: the exporter lists the IPPIS rows for the period in each database. If any database shows `NONE`, it warns and asks "Export without IPPIS anyway" (default **No**). Answer No, upload the month's IPPIS, then export again. Staff payslips would otherwise miss their IPPIS earnings and deductions. A database with no IPPIS table at all is only noted. Full packages are not checked.
    - Check the summary (package number, what it follows) and press Enter.
 5. **STEP 3 — Done.** Write in the media log: file name, sequence, **fingerprint**, size, your name, the date.
 6. Remove the drive and hand it over under the media procedure.
@@ -40,6 +41,7 @@ The program never connects to the internet and never changes payroll data.
 | The drive was lost, or the file never reached the website | Run `navy-sync-exporter.exe --discard-last`, then export again |
 | The website team rolled back a month | Run `--discard-last`, then export again when payroll is corrected |
 | The website asks for a full package | Export with Kind = 2 (Full) |
+| "No IPPIS for …" warning | Stop (answer No). Upload the month's IPPIS in payroll, then run the exporter again. Export without IPPIS only if the payroll office decides staff must have payslips before IPPIS arrives |
 | A timing test is requested | `navy-sync-exporter.exe --dry-run` (the website never applies it) |
 | Server or database names changed | `navy-sync-exporter.exe --setup` |
 | See what was exported before | `navy-sync-exporter.exe --ledger` |

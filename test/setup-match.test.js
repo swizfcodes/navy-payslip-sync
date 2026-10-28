@@ -41,9 +41,37 @@ test("hr_employees and py_payrollclass are master only; IPPIS is optional", () =
   const names = (db) => tablesFor(db, "month").map((t) => t.name);
   assert.ok(names("officers").includes("hr_employees"));
   assert.ok(names("officers").includes("py_payrollclass"));
+  const masterOnly = ["hr_employees", "py_payrollclass", "ac_months", "py_bank", "py_pfa", "ac_businessline", "ac_costcentre"];
+  for (const t of masterOnly) assert.ok(names("officers").includes(t), t);
   for (const db of ["wofficers", "ratings", "ratingsA", "ratingsB", "juniorTrainee"]) {
-    assert.ok(!names(db).includes("hr_employees"), db);
-    assert.ok(!names(db).includes("py_payrollclass"), db);
+    for (const t of masterOnly) assert.ok(!names(db).includes(t), `${db} ${t}`);
+    assert.ok(names(db).includes("py_elementtype"), db);
   }
   assert.equal(tablesFor("juniorTrainee", "month").find((t) => t.name === "py_ipis_payhistory").optional, true);
+});
+
+test("classcode decides before the class name (website names such as RATE A)", async () => {
+  const { databaseForClasscode } = require("../shared/manifest");
+  assert.equal(databaseForClasscode("3"), "ratings");
+  assert.equal(databaseForClasscode(6), "juniorTrainee");
+  assert.equal(databaseForClasscode("06"), "juniorTrainee");
+  assert.equal(databaseForClasscode("9"), null);
+  const found = [
+    { name: "hicaddata", hasPayrollClass: true },
+    { name: "hicaddata2", hasPayrollClass: false },
+    { name: "hicaddata4", hasPayrollClass: false },
+  ];
+  const s = await suggestMapping(
+    {
+      payrollClasses: async () => [
+        { classcode: "1", classname: "OFFICERS", db_name: "hicaddata" },
+        { classcode: "3", classname: "RATE A", db_name: "hicaddata2" },
+        { classcode: "5", classname: "RATE C", db_name: "hicaddata4" },
+      ],
+    },
+    found,
+  );
+  assert.equal(s.officers, "hicaddata");
+  assert.equal(s.ratings, "hicaddata2");
+  assert.equal(s.ratingsB, "hicaddata4");
 });

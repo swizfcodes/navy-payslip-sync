@@ -8,7 +8,7 @@
  * Passwords are never saved.
  */
 
-const { DATABASES, MASTER_DATABASE } = require("../../shared/manifest");
+const { DATABASES, MASTER_DATABASE, databaseForClasscode } = require("../../shared/manifest");
 const { DEFAULTS, saveConfig } = require("../config");
 const { num } = require("./format");
 
@@ -43,11 +43,13 @@ async function suggestMapping(source, found) {
   if (masters.length) {
     const rows = await source.payrollClasses(masters[0].name);
     if (rows.length) {
+      const codeCol = pickColumn(rows[0], ["classcode", "class_code", "code"]);
       const nameCol = pickColumn(rows[0], ["classname", "description", "classdesc", "name"]);
       const dbCol = pickColumn(rows[0], ["db_name", "dbname", "database", "databasename"]);
-      if (nameCol && dbCol) {
+      if ((codeCol || nameCol) && dbCol) {
         for (const r of rows) {
-          const key = matchClassKey(r[nameCol]);
+          // classcode first (the same codes as the website), the class name only as a fallback
+          const key = (codeCol && databaseForClasscode(r[codeCol])) || (nameCol && matchClassKey(r[nameCol]));
           const db = names.get(String(r[dbCol] || "").trim().toLowerCase());
           if (key && db && !suggestion[key]) suggestion[key] = db;
         }

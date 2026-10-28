@@ -57,13 +57,33 @@ Decrypted payload: a sequence of records `[uint8 type][uint32 nameLength][name][
 
 | type | name | data |
 |---|---|---|
-| 1 batch | `batches/<db>/<table>[/<scope>]/<00001>.json.gz` | gzipped batch JSON |
+| 1 batch | `batches/<db>/<table>[/<scope>]/<00001>.npb` | `NPB2` + brotli batch JSON (version 2). Packages from 0.1.0–0.1.2: gzipped JSON, `.json.gz` (version 1), still read |
 | 2 manifest | `manifest.json` | package manifest JSON |
 | 255 end | `end` | empty |
 
 Order: all batches (databases interleaved, batches of one table in order), then the manifest, then the end record. **The manifest comes last** because row counts are only known after reading. The website loads batches into stage tables as they arrive and checks them against the manifest at the end.
 
-Batch:
+Batch, version 2 (from 0.1.3). The bytes are the 4 ASCII bytes `NPB2`, then brotli (quality `packQuality`, default 9; 16 MB window) of this JSON. Rows are stored **column by column** in `cols`:
+
+```json
+{
+  "v": 2,
+  "database": "ratings",
+  "table": "py_ipis_payhistory",
+  "mode": "replace-scope",
+  "scope": { "period": "202610" },
+  "batchNo": 3,
+  "columns": ["numb", "period", "bpc", "bpa", "bp", "bpm", "createdby", "datecreated", "Type"],
+  "types":   ["string", "string", "string", "string", "string", "decimal", "string", "datetime", "string"],
+  "rowCount": 1,
+  "cols": [["NN1234"], ["202610"], ["BP"], ["TAXABLE PAYMENT"], ["BASIC SALARY"], ["250000.0000"], [null], ["2026-10-02 10:11:12"], ["BP001"]],
+  "checksum": "sha256:…"
+}
+```
+
+Payroll tables repeat down a column (element code, year, `0.0000`) and across neighbouring month columns; column by column with a 16 MB window, both become long matches. `decodeBatch()` returns `rows` (row by row) for both versions, and the checksum is over the rows, so it does not depend on the encoding.
+
+Version 1 (0.1.0–0.1.2), gzip level 6, row by row:
 
 ```json
 {
@@ -81,7 +101,7 @@ Batch:
 ```
 
 - `types`: `string`, `int`, `bigint` (string), `decimal` (string, exact), `float`, `bit` (0/1), `date` ("YYYY-MM-DD"), `datetime` ("YYYY-MM-DD HH:MM:SS"), `time`, `binary` (base64). Column names keep the source spelling; match them to MySQL columns case-insensitively.
-- Up to 5,000 rows per batch. The batch count per table is in the manifest.
+- Up to `batchRows` rows per batch (default 10,000). The batch count per table is in the manifest.
 - `merge-columns` batches carry the key plus only the columns to write (for `py_payhistory`: key + the month column groups being sent).
 
 Package manifest (the `manifest.json` record):

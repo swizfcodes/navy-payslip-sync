@@ -32,6 +32,25 @@ const MANIFEST_VERSION = 1;
 /** Website database names, one per payroll class. The exporter maps each to its source database. */
 const DATABASES = ["officers", "wofficers", "ratings", "ratingsA", "ratingsB", "juniorTrainee"];
 
+/**
+ * py_payrollclass.classcode of each database. On both sides a class database is found by
+ * its classcode (py_payrollclass.db_name gives the database), not by its name or by settings.
+ */
+const DATABASE_CLASSCODES = {
+  officers: "1",
+  wofficers: "2",
+  ratings: "3",
+  ratingsA: "4",
+  ratingsB: "5",
+  juniorTrainee: "6",
+};
+
+/** Database key for a py_payrollclass.classcode, or null. */
+function databaseForClasscode(code) {
+  const c = String(code == null ? "" : code).trim().replace(/^0+(?=\d)/, "");
+  return Object.keys(DATABASE_CLASSCODES).find((k) => DATABASE_CLASSCODES[k] === c) || null;
+}
+
 /** Database that also holds master-only tables (py_payrollclass). officers = hicaddata. */
 const MASTER_DATABASE = "officers";
 
@@ -54,23 +73,28 @@ const HR_EMPLOYEES_PAYROLL_COLUMNS = [
 
 const ALL = "*";
 
-function lookup(name, key) {
+function lookup(name, key, { masterOnly = false } = {}) {
   return {
     name,
     key,
     columns: ALL,
+    ...(masterOnly ? { masterOnly: true } : {}),
     month: { mode: "swap", applyAt: "prepare" },
     full: { mode: "swap", applyAt: "golive" },
   };
 }
 
+// Shared lookups live only in the master (hicaddata), in payroll and on the website
+// (config/db.js MASTER_TABLES): sent once, from officers; never looked for in class databases.
+const MASTER = { masterOnly: true };
+
 const TABLES = [
-  lookup("ac_months", ["cmonth"]),
+  lookup("ac_months", ["cmonth"], MASTER),
   lookup("py_elementtype", ["PaymentType"]),
-  lookup("py_bank", ["bankcode", "branchcode"]),
-  lookup("py_pfa", ["pfacode"]),
-  lookup("ac_businessline", ["busline"]),
-  lookup("ac_costcentre", ["unitcode"]),
+  lookup("py_bank", ["bankcode", "branchcode"], MASTER),
+  lookup("py_pfa", ["pfacode"], MASTER),
+  lookup("ac_businessline", ["busline"], MASTER),
+  lookup("ac_costcentre", ["unitcode"], MASTER),
   {
     ...lookup("py_payrollclass", ["classcode"]),
     masterOnly: true,
@@ -166,6 +190,8 @@ function findTable(name) {
 module.exports = {
   MANIFEST_VERSION,
   DATABASES,
+  DATABASE_CLASSCODES,
+  databaseForClasscode,
   MASTER_DATABASE,
   HR_EMPLOYEES_PAYROLL_COLUMNS,
   TABLES,

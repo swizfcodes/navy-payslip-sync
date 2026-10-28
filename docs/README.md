@@ -11,7 +11,7 @@ This folder is the home of all project documentation. Each document covers one s
 | New to the project | [Project overview](01-overview/project-overview.md), then [Architecture](02-design/architecture.md) |
 | Dev A (exporter) | [Developer guide](04-guides/developer-guide.md), [Package format](03-reference/package-format.md), [Exporter commands](03-reference/exporter-cli.md) |
 | Dev B (website) | [Website contract](03-reference/website-contract.md), [Shared library API](03-reference/shared-api.md), [Data and tables](02-design/data-and-tables.md) |
-| The payroll officer (inside) | [Payroll officer guide](04-guides/payroll-officer-guide.md) |
+| The payroll officer (inside) | [Exporter user guide](04-guides/exporter-user-guide.md) (plain language, printable), [Payroll officer guide](04-guides/payroll-officer-guide.md), [SQL Server connection problems](06-operations/sql-server-connection-problems.md) |
 | The sync officer (website) | [Sync officer guide](04-guides/sync-officer-guide.md) |
 | A security reviewer | [Security](02-design/security.md), [Build and release](04-guides/build-and-release.md) |
 | Planning or testing the delivery | [Work split](05-delivery/work-split.md), [Test plan](05-delivery/test-plan.md) |
@@ -36,6 +36,7 @@ This folder is the home of all project documentation. Each document covers one s
 - [Exporter commands and files](03-reference/exporter-cli.md)
 
 **04 Guides**
+- [Exporter user guide](04-guides/exporter-user-guide.md): step by step for a non-technical payroll officer (print it)
 - [Payroll officer guide](04-guides/payroll-officer-guide.md): using the exporter inside the offline network
 - [Sync officer guide](04-guides/sync-officer-guide.md): upload, approve, Go live, roll back on the website
 - [Developer guide](04-guides/developer-guide.md): set up, code layout, rules, tests, adding a table
@@ -48,6 +49,7 @@ This folder is the home of all project documentation. Each document covers one s
 **06 Operations**
 - [Monthly procedure](06-operations/monthly-procedure.md)
 - [Troubleshooting and recovery](06-operations/troubleshooting-and-recovery.md)
+- [SQL Server connection problems](06-operations/sql-server-connection-problems.md): every reason the exporter cannot connect (service, TCP/IP, port, SQL Browser, firewall, logins, encryption) and the fix
 
 ## Status (21 Oct 2026)
 

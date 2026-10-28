@@ -14,9 +14,9 @@
  * Decrypted payload = a sequence of records:
  *   uint8  type        1 = batch, 2 = manifest, 255 = end
  *   uint32 nameLength  (big-endian)
- *   bytes  name        utf8, e.g. "batches/ratings/py_ipis_payhistory/period=202610/00003.json.gz"
+ *   bytes  name        utf8, e.g. "batches/ratings/py_ipis_payhistory/period=202610/00003.npb"
  *   uint32 dataLength  (big-endian)
- *   bytes  data        batch: gzipped batch JSON (batch-format.js); manifest: JSON
+ *   bytes  data        batch: brotli batch, rows by column (batch-format.js; older packages: gzipped JSON); manifest: JSON
  *
  * Order: all batch records (databases interleaved), then the manifest, then the end record.
  *

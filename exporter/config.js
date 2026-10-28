@@ -4,6 +4,11 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const { stateDir, statePath } = require("./paths");
 const { DATABASES } = require("../shared/manifest");
+const { DEFAULT_QUALITY } = require("../shared/batch-format");
+
+// Defaults before 0.1.3. A config.json still holding them gets the new ones (bigger
+// batches compress better now that batches are brotli, column by column).
+const OLD_DEFAULT_BATCH_ROWS = 5000;
 
 const CONFIG_FILE = "config.json";
 
@@ -16,7 +21,9 @@ const CONFIG_FILE = "config.json";
  *   "databases": { "officers": "HicadData", "wofficers": "...", ... },   // website name -> source name ("" = skip)
  *   "outputDir": "E:\\",
  *   "lastOperator": "",
- *   "batchRows": 5000,
+ *   "batchRows": 10000,
+ *   "packQuality": 9,          // brotli quality 1-11 for Full packages: higher = smaller, slower
+ *   "packQualityMonth": 6,     // the same for Month packages (kept fast for the 15 min target)
  *   "concurrency": 6,          // databases exported at the same time
  *   "useProcesses": true       // each in its own process, so each gets its own CPU core
  * }
@@ -34,7 +41,9 @@ const DEFAULTS = {
   databases: Object.fromEntries(DATABASES.map((d) => [d, ""])),
   outputDir: "",
   lastOperator: "",
-  batchRows: 5000,
+  batchRows: 10000,
+  packQuality: DEFAULT_QUALITY,
+  packQualityMonth: 6,
   concurrency: 6,
   useProcesses: true, // one process per database (uses more CPU cores); false = all in one process
 };
@@ -55,6 +64,7 @@ async function loadConfig() {
     source: { ...DEFAULTS.source, ...(raw.source || {}) },
     databases: { ...DEFAULTS.databases, ...(raw.databases || {}) },
   };
+  if (raw.batchRows === OLD_DEFAULT_BATCH_ROWS) cfg.batchRows = DEFAULTS.batchRows;
   validateConfig(cfg);
   return cfg;
 }
@@ -78,6 +88,9 @@ function validateConfig(cfg) {
   }
   if (!Number.isInteger(cfg.batchRows) || cfg.batchRows < 100 || cfg.batchRows > 50000) {
     throw new Error("batchRows must be between 100 and 50000");
+  }
+  for (const k of ["packQuality", "packQualityMonth"]) {
+    if (!Number.isInteger(cfg[k]) || cfg[k] < 1 || cfg[k] > 11) throw new Error(`${k} must be between 1 and 11`);
   }
   if (!Number.isInteger(cfg.concurrency) || cfg.concurrency < 1 || cfg.concurrency > 6) {
     throw new Error("concurrency must be between 1 and 6");

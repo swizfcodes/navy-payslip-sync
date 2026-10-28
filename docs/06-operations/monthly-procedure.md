@@ -4,7 +4,7 @@ The same steps every month. Inside: [Payroll officer guide](../04-guides/payroll
 
 ## Steps
 
-1. Payroll closes the month's calculation.
+1. Payroll closes the month's calculation and uploads the month's IPPIS (the exporter warns on a Month export when a database has no IPPIS for the period).
 2. Payroll officer runs the exporter: Connect → Export. Notes seq, size and fingerprint in the media log.
 3. Media moves out under the media procedure.
 4. Sync officer uploads in the Console, checks the fingerprint matches the log, reviews the totals screen.

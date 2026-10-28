@@ -16,7 +16,8 @@ What one month's package holds, per payroll database:
 
 | Table | Mode | Key / scope | In the package | Applied at |
 |---|---|---|---|---|
-| `ac_months`, `py_elementtype`, `py_bank`, `py_pfa`, `ac_businessline`, `ac_costcentre` | swap | whole table | Full table (small) | Prepare, skipped if unchanged |
+| `ac_months`, `py_bank`, `py_pfa`, `ac_businessline`, `ac_costcentre` (master `hicaddata` only) | swap | whole table | Full table (small) | Prepare, skipped if unchanged |
+| `py_elementtype` (every database) | swap | whole table | Full table (small) | Prepare, skipped if unchanged |
 | `hr_employees` (payroll columns only) | merge-columns | `EMPL_ID` | **Master (`officers`) only.** Payroll columns for all staff (narrow; compresses well) | Prepare |
 | `py_ipis_payhistory` | replace-scope | `period` | Rows of the period. **Optional:** skipped where the source database has no IPPIS table | Prepare |
 | `py_payhistory` | merge-columns | `his_empno, his_year, his_type` | Only month column groups **closed** since the previous package (normally one); never the current month, which is read from `py_masterpayded`; only rows of that year | Prepare |
